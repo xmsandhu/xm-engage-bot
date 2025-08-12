@@ -1,0 +1,9 @@
+html, body, #root { height: 100%; margin: 0; }
+.app { display: flex; flex-direction: column; height: 100%; background: #0f172a; color: #e2e8f0; }
+.header { padding: 12px 16px; border-bottom: 1px solid #1f2937; display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
+.header input[type="text"] { flex: 1; min-width: 240px; padding: 8px 10px; border-radius: 8px; border: 1px solid #374151; background: #111827; color: #e5e7eb; }
+.header .file { color: #e5e7eb; }
+.container { flex: 1; display:flex; justify-content:center; align-items:center; padding: 16px; }
+.card { width: 100%; max-width: 420px; }
+.hint { font-size: 12px; opacity: 0.8; margin-left: 2px; }
+.badge { background:#1f2937; border:1px solid #374151; padding:2px 8px; border-radius:999px; font-size:12px; }
