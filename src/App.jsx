@@ -60,7 +60,8 @@ export default function App() {
   return (
     <div className="app">
       <div className="header">
-        <span className="badge">xm-engage-bot</span>
+        <span className="badge">Xminds Connect</span>
+        <a href="https://xminds.com" target="_blank" rel="noreferrer" className="hint">xminds.com</a>
         <input
           type="text"
           placeholder="API URL (e.g. https://your-api.execute-api.<region>.amazonaws.com/<stage>/execute or /api/chat)"

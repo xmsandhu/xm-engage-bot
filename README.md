@@ -1,6 +1,8 @@
-# xm-engage-bot
+# Xminds Connect (xm-engage-bot)
 
-A lightweight test UI for a guided, friendly intake chatbot that calls an AWS API Gateway + Lambda backend (OpenRouter integration).
+A lightweight test UI for a guided, friendly intake chatbot by Xminds Connect that calls an AWS API Gateway + Lambda backend (OpenRouter integration).
+
+Website: https://xminds.com/
 
 ## Features
 - React + Vite + React ChatBotify
