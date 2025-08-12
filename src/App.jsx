@@ -6,10 +6,9 @@ const DEFAULT_API = import.meta.env.VITE_API_URL || '/api/chat'
 export default function App() {
   const apiUrlRef = React.useRef(DEFAULT_API)
   const [apiUrl, setApiUrl] = React.useState(DEFAULT_API)
-  // keep API key field for local testing, but not needed when proxying via Netlify
   const apiKeyRef = React.useRef(import.meta.env.VITE_API_KEY || '')
   const [apiKey, setApiKey] = React.useState(apiKeyRef.current)
-  const historyRef = React.useRef([]) // [{role, content}]
+  const historyRef = React.useRef([])
   const collectedRef = React.useRef({})
 
   const flow = {
@@ -24,44 +23,35 @@ export default function App() {
       async function(params) {
         const user = String(params.userInput || '').trim()
         if (!user) return 'talk'
-
         const payload = {
           mode: 'guided',
           message: user,
           history: historyRef.current,
           collected: collectedRef.current,
         }
-
         try {
           const res = await fetch(apiUrlRef.current, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              // x-api-key not required when calling Netlify function
               ...(apiUrlRef.current.startsWith('http') && apiKeyRef.current ? { 'x-api-key': apiKeyRef.current } : {})
             },
             body: JSON.stringify(payload)
           })
           const json = await res.json()
           const reply = json.reply || 'Sorry, I had trouble responding.'
-
-          // update history
           historyRef.current.push({ role: 'user', content: user })
           historyRef.current.push({ role: 'assistant', content: reply })
-
           if (json.control?.collected) {
             collectedRef.current = { ...collectedRef.current, ...json.control.collected }
           }
-
           await params.simulateStreamMessage(reply)
-
           if (json.control?.done) {
             await params.simulateStreamMessage('Thanks! I\'ve captured your details. We\'ll be in touch shortly.')
           }
         } catch (e) {
           await params.simulateStreamMessage('Sorry, something went wrong. Please try again.')
         }
-
         return 'talk'
       }
     }
@@ -70,7 +60,7 @@ export default function App() {
   return (
     <div className="app">
       <div className="header">
-        <span className="badge">Project Intake Bot</span>
+        <span className="badge">xm-engage-bot</span>
         <input
           type="text"
           placeholder="API URL (e.g. https://your-api.execute-api.<region>.amazonaws.com/<stage>/execute or /api/chat)"
@@ -89,7 +79,7 @@ export default function App() {
           <ChatBot
             settings={{
               general: { embedded: true, primaryColor: '#7c3aed', secondaryColor: '#22d3ee' },
-              chatHistory: { storageKey: 'react_web_bot_test' }
+              chatHistory: { storageKey: 'xm_engage_bot_history' }
             }}
             flow={flow}
           />

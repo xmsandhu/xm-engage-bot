@@ -1,4 +1,4 @@
-# Project Intake Bot (React ChatBotify Test)
+# xm-engage-bot
 
 A lightweight test UI for a guided, friendly intake chatbot that calls an AWS API Gateway + Lambda backend (OpenRouter integration).
 
