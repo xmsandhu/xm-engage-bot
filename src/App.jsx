@@ -15,13 +15,14 @@ export default function App() {
   const [sessionKey, setSessionKey] = React.useState(0)
   const [aiSummary, setAiSummary] = React.useState('')
   const [building, setBuilding] = React.useState(false)
+  const [canSummarize, setCanSummarize] = React.useState(false)
   const contactStageRef = React.useRef('name') // 'name' -> 'email'
   const contactDoneRef = React.useRef(false) // guard to avoid re-entering contact after completion
 
   // tighten email validation (require at least 2-char TLD)
   const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)
   const handleBuildAiSummary = async () => {
-    if (building) return
+    if (building || !canSummarize) return
     setBuilding(true)
     try {
       const res = await fetch(apiUrlRef.current, {
@@ -55,6 +56,46 @@ export default function App() {
     return lines.join('\n') || 'No details collected yet.'
   }
 
+  // Shared helper to send a chat turn to the API and stream the reply
+  const sendChat = async (params, user) => {
+    const text = String(user || '').trim()
+    if (text) setCanSummarize(true)
+    const payload = {
+      mode: 'guided',
+      message: text,
+      history: historyRef.current,
+      collected: collectedRef.current,
+    }
+    try {
+      console.log('[chat] POST', apiUrlRef.current, payload)
+      const res = await fetch(apiUrlRef.current, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiUrlRef.current.startsWith('http') && apiKeyRef.current ? { 'x-api-key': apiKeyRef.current } : {})
+        },
+        body: JSON.stringify(payload)
+      })
+      let json
+      try { json = await res.json() } catch { const txt = await res.text(); try { json = JSON.parse(txt) } catch { json = {} } }
+      if (json && typeof json === 'object' && 'body' in json && typeof json.body === 'string') {
+        try { json = JSON.parse(json.body) } catch {}
+      }
+      const reply = json?.reply || 'Sorry, I had trouble responding.'
+      historyRef.current.push({ role: 'user', content: text })
+      historyRef.current.push({ role: 'assistant', content: reply })
+      if (json?.control?.collected) {
+        collectedRef.current = { ...collectedRef.current, ...json.control.collected }
+      }
+      await params.simulateStreamMessage(reply)
+      if (json?.control?.done) {
+        await params.simulateStreamMessage('Thanks! I\'ve captured your details. We\'ll be in touch shortly.')
+      }
+    } catch (e) {
+      await params.simulateStreamMessage('Sorry, something went wrong. Please try again.')
+    }
+  }
+
   const flow = {
     start: {
       message: "Hi! I’m your friendly project assistant. Ready to get started?",
@@ -66,13 +107,17 @@ export default function App() {
     contact: {
       message: "Before we begin, what's your name?",
       async function(params) {
-        // If contact is already completed, immediately route to talkLoop so input is handled by the chat handler
-        if (contactStageRef.current === 'done' || contactDoneRef.current) {
-          return 'talkLoop'
-        }
         const raw = params.userInput
         const text = String(raw || '').trim()
         const stage = contactStageRef.current || 'name'
+
+        // If contact completed, handle any immediate user text here so it's not lost
+        if (contactStageRef.current === 'done' || contactDoneRef.current) {
+          if (typeof raw === 'undefined' || !text) return 'talkLoop'
+          await sendChat(params, text)
+          return 'talkLoop'
+        }
+
         if (typeof raw === 'undefined') return // wait for input
         // Stage: name
         if (stage === 'name') {
@@ -80,6 +125,7 @@ export default function App() {
           collectedRef.current = { ...collectedRef.current, name: text }
           await params.injectMessage(`Nice to meet you, ${text}!`)
           await params.injectMessage("Great. What's the best email to reach you?")
+          await params.injectMessage("Privacy: By sharing your email, you consent to follow-up and storing this chat for service improvement.")
           contactStageRef.current = 'email'
           return 'contact' // stay on this node and wait for email
         }
@@ -105,47 +151,14 @@ export default function App() {
       async function(params) {
         const user = String(params.userInput || '').trim()
         if (!user || ended) return 'talkLoop'
-        const payload = {
-          mode: 'guided',
-          message: user,
-          history: historyRef.current,
-          collected: collectedRef.current,
-        }
-        try {
-          console.log('[chat] POST', apiUrlRef.current, payload)
-          const res = await fetch(apiUrlRef.current, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(apiUrlRef.current.startsWith('http') && apiKeyRef.current ? { 'x-api-key': apiKeyRef.current } : {})
-            },
-            body: JSON.stringify(payload)
-          })
-          let json
-          try { json = await res.json() } catch { const txt = await res.text(); try { json = JSON.parse(txt) } catch { json = {} } }
-          if (json && typeof json === 'object' && 'body' in json && typeof json.body === 'string') {
-            try { json = JSON.parse(json.body) } catch {}
-          }
-          const reply = json?.reply || 'Sorry, I had trouble responding.'
-          historyRef.current.push({ role: 'user', content: user })
-          historyRef.current.push({ role: 'assistant', content: reply })
-          if (json?.control?.collected) {
-            collectedRef.current = { ...collectedRef.current, ...json.control.collected }
-          }
-          await params.simulateStreamMessage(reply)
-          if (json?.control?.done) {
-            await params.simulateStreamMessage('Thanks! I\'ve captured your details. We\'ll be in touch shortly.')
-          }
-        } catch (e) {
-          await params.simulateStreamMessage('Sorry, something went wrong. Please try again.')
-        }
+        await sendChat(params, user)
         return 'talkLoop'
       }
     }
   }
 
   const handleEndChat = () => setEnded(true)
-  const handleRestart = () => { setEnded(false); historyRef.current = []; collectedRef.current = {}; contactStageRef.current = 'name'; contactDoneRef.current = false; setSessionKey(k => k + 1); setAiSummary('') }
+  const handleRestart = () => { setEnded(false); historyRef.current = []; collectedRef.current = {}; contactStageRef.current = 'name'; contactDoneRef.current = false; setSessionKey(k => k + 1); setAiSummary(''); setCanSummarize(false) }
 
   return (
     <div className="app">
@@ -168,7 +181,7 @@ export default function App() {
                 <button
                   className="btn btn-primary"
                   style={{ position: 'absolute', top: 12, right: 12, backgroundColor: '#ef4444', borderColor: '#ef4444', color: '#fff', fontWeight: 700, borderRadius: 9999, padding: '8px 14px', boxShadow: '0 6px 18px rgba(0,0,0,0.3)' }}
-                  onClick={handleEndChat}
+                  onClick={() => setEnded(true)}
                   title="End chat"
                   aria-label="End chat"
                 >⛔ End</button>
@@ -208,11 +221,16 @@ export default function App() {
               <h3>Summary</h3>
             </div>
             <div className="side-body">
-              <button className="btn btn-primary" onClick={handleBuildAiSummary} disabled={building}>
+              <button className="btn btn-primary" onClick={handleBuildAiSummary} disabled={building || !canSummarize}>
                 {building ? 'Building…' : 'Build AI Summary'}
               </button>
               <pre className="summary" style={{ marginTop: 12 }}>{aiSummary || buildSummary()}</pre>
               <button className="btn btn-ghost" onClick={()=>{ navigator.clipboard?.writeText(aiSummary || buildSummary()) }}>Copy Summary</button>
+              {!canSummarize && (
+                <div style={{ marginTop: 8, fontSize: 12, color: '#9CA3AF' }}>
+                  Share a bit about your project to enable AI summary.
+                </div>
+              )}
             </div>
           </aside>
         </div>
