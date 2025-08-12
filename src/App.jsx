@@ -1,5 +1,6 @@
 import React from 'react'
 import ChatBot from 'react-chatbotify'
+import bot from './assets/bot.png'
 
 const DEFAULT_API = import.meta.env.VITE_API_URL || '/api/chat'
 
@@ -38,15 +39,25 @@ export default function App() {
             },
             body: JSON.stringify(payload)
           })
-          const json = await res.json()
-          const reply = json.reply || 'Sorry, I had trouble responding.'
+          let json
+          try {
+            json = await res.json()
+          } catch {
+            const txt = await res.text()
+            try { json = JSON.parse(txt) } catch { json = {} }
+          }
+          // Unwrap Lambda proxy style { statusCode, headers, body } if present
+          if (json && typeof json === 'object' && 'body' in json && typeof json.body === 'string') {
+            try { json = JSON.parse(json.body) } catch { /* keep as-is */ }
+          }
+          const reply = json?.reply || 'Sorry, I had trouble responding.'
           historyRef.current.push({ role: 'user', content: user })
           historyRef.current.push({ role: 'assistant', content: reply })
-          if (json.control?.collected) {
+          if (json?.control?.collected) {
             collectedRef.current = { ...collectedRef.current, ...json.control.collected }
           }
           await params.simulateStreamMessage(reply)
-          if (json.control?.done) {
+          if (json?.control?.done) {
             await params.simulateStreamMessage('Thanks! I\'ve captured your details. We\'ll be in touch shortly.')
           }
         } catch (e) {
@@ -81,7 +92,7 @@ export default function App() {
             settings={{
               general: { embedded: true, primaryColor: '#7c3aed', secondaryColor: '#22d3ee', showFooter: false, showHeader: true },
               footer: { text: '' },
-              header: { title: 'Xminds Connect', showAvatar: true, avatar: 'https://xminds.com/favicon.ico' },
+              header: { title: 'Xminds Connect', showAvatar: true, avatar: bot },
               chatHistory: { storageKey: 'xm_engage_bot_history' }
             }}
             flow={flow}
