@@ -79,7 +79,9 @@ export default function App() {
         <div className="card">
           <ChatBot
             settings={{
-              general: { embedded: true, primaryColor: '#7c3aed', secondaryColor: '#22d3ee' },
+              general: { embedded: true, primaryColor: '#7c3aed', secondaryColor: '#22d3ee', showFooter: false, showHeader: true },
+              footer: { text: '' },
+              header: { title: 'Xminds Connect', showAvatar: true, avatar: 'https://xminds.com/favicon.ico' },
               chatHistory: { storageKey: 'xm_engage_bot_history' }
             }}
             flow={flow}
